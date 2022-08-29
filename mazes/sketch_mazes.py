@@ -17,11 +17,13 @@ class LaticePoint:
 
 class GridMatrix:
 
-    def __init__(self, width: int, height: int, scale):
+    def __init__(self, width: int, height: int, scale, vsk):
 
         self.matrix = []
         self.width: int = width
         self.height: int = height
+        self.scale = scale
+        self.vsk = vsk
         for row in range(height):
             self.matrix.append([])
             for col in range(width):
@@ -30,6 +32,30 @@ class GridMatrix:
                     self.matrix[row][col].draw_down = False
                 if col == width - 1:
                     self.matrix[row][col].draw_right = False
+
+    def wobble(self, min_dist):
+        for row in range(self.height):
+            for col in range(self.width):
+                if col != 0:
+                    left_bound = self.matrix[row][col - 1].x + min_dist
+                else:
+                    left_bound = 0
+                if col != self.width - 1:
+                    right_bound = self.matrix[row][col + 1].x + min_dist
+                else:
+                    right_bound = self.width * self.scale
+                if row != 0:
+                    top_bound = self.matrix[row - 1][col].y + min_dist
+                else:
+                    top_bound = 0
+                if row != self.height - 1:
+                    bottom_bound = self.matrix[row + 1][col].y + min_dist
+                else:
+                    bottom_bound = self.height * self.scale
+                self.matrix[row][col].x = self.vsk.random(left_bound,
+                                                          right_bound)
+                self.matrix[row][col].y = self.vsk.random(top_bound,
+                                                          bottom_bound)
 
     def get_width(self) -> int:
         return self.width
@@ -84,7 +110,7 @@ class GrowingTreeMaze(object):
         self._width = width
         self._height = height
         self._vsk = vsk
-        self._matrix = GridMatrix(width, height, scale)
+        self._matrix = GridMatrix(width, height, scale, vsk)
 
     def get_uncarved_neighbors(self, point):
         """Return a list of directions (suitable for input into carve) of
@@ -102,6 +128,7 @@ class GrowingTreeMaze(object):
                 neighbors.append((direction, neighbor))
         return neighbors
 
+    # TODO: this probably belongs on GridMatrix
     def carve(self, point, direction):
         if direction == 'U':
             if point.row == 0:
@@ -154,11 +181,11 @@ class MazesSketch(vsketch.SketchClass):
         vsk.size("a4", landscape=False)
         vsk.scale("mm")
 
-        print("width: %s" % vsk.width)
-        print("height: %s" % vsk.height)
         gtree = GrowingTreeMaze(40, 58, 5, vsk)
         gtree.generate()
-        matrix = gtree.get_grid()
+        # matrix = gtree.get_grid()
+        matrix = GridMatrix(10, 10, 15, vsk)
+        matrix.wobble(1)
         for row_index in range(matrix.get_height()):
             for col_index in range(matrix.get_width()):
                 if matrix.point_at(row_index, col_index).draw_right:
