@@ -1,5 +1,7 @@
 from collections import namedtuple
-import vsketch
+import random
+import svgwrite
+from svgwrite.shapes import Line
 
 
 class LaticePoint:
@@ -17,13 +19,12 @@ class LaticePoint:
 
 class GridMatrix:
 
-    def __init__(self, width: int, height: int, scale, vsk):
+    def __init__(self, width: int, height: int, scale):
 
         self.matrix = []
         self.width: int = width
         self.height: int = height
         self.scale = scale
-        self.vsk = vsk
         for row in range(height):
             self.matrix.append([])
             for col in range(width):
@@ -32,30 +33,6 @@ class GridMatrix:
                     self.matrix[row][col].draw_down = False
                 if col == width - 1:
                     self.matrix[row][col].draw_right = False
-
-    def wobble(self, min_dist):
-        for row in range(self.height):
-            for col in range(self.width):
-                if col != 0:
-                    left_bound = self.matrix[row][col - 1].x + min_dist
-                else:
-                    left_bound = 0
-                if col != self.width - 1:
-                    right_bound = self.matrix[row][col + 1].x + min_dist
-                else:
-                    right_bound = self.width * self.scale
-                if row != 0:
-                    top_bound = self.matrix[row - 1][col].y + min_dist
-                else:
-                    top_bound = 0
-                if row != self.height - 1:
-                    bottom_bound = self.matrix[row + 1][col].y + min_dist
-                else:
-                    bottom_bound = self.height * self.scale
-                self.matrix[row][col].x = self.vsk.random(left_bound,
-                                                          right_bound)
-                self.matrix[row][col].y = self.vsk.random(top_bound,
-                                                          bottom_bound)
 
     def get_width(self) -> int:
         return self.width
@@ -100,7 +77,7 @@ class GrowingTreeMaze(object):
 
     """Store and display growing tree mazes"""
 
-    def __init__(self, width, height, scale, vsk):
+    def __init__(self, width, height, scale):
         """Initialize the "empty" map matrix, growing parameters
 
         :param height: Display height of the finished maze
@@ -109,8 +86,7 @@ class GrowingTreeMaze(object):
         """
         self._width = width
         self._height = height
-        self._vsk = vsk
-        self._matrix = GridMatrix(width, height, scale, vsk)
+        self._matrix = GridMatrix(width, height, scale)
 
     def get_uncarved_neighbors(self, point):
         """Return a list of directions (suitable for input into carve) of
@@ -152,18 +128,16 @@ class GrowingTreeMaze(object):
     def generate(self):
         """Generate the maze
         """
-        start_col = int(self._vsk.random(0, self._width - 1))
-        start_row = int(self._vsk.random(0, self._height - 1))
+        start_col = int(random.randrange(0, self._width))
+        start_row = int(random.randrange(0, self._height))
         to_carve_list = [Point(start_row, start_col)]
         while to_carve_list:
-            point = to_carve_list[
-                    int(self._vsk.random(len(to_carve_list) - 1))]
+            point = random.choice(to_carve_list)
             neighbors = self.get_uncarved_neighbors(point)
             if len(neighbors) == 0:
                 to_carve_list.remove(point)
                 continue
-            direction, next_point = neighbors[
-                                    int(self._vsk.random(len(neighbors) - 1))]
+            direction, next_point = random.choice(neighbors)
             self.carve(point, direction)
             to_carve_list.append(next_point)
 
@@ -174,38 +148,37 @@ class GrowingTreeMaze(object):
         return str(self._matrix)
 
 
-class MazesSketch(vsketch.SketchClass):
-    # Sketch parameters:
-    # radius = vsketch.Param(2.0)
-    def draw(self, vsk: vsketch.Vsketch) -> None:
-        vsk.size("a4", landscape=False)
-        vsk.scale("mm")
-
-        gtree = GrowingTreeMaze(40, 58, 5, vsk)
-        gtree.generate()
-        # matrix = gtree.get_grid()
-        matrix = GridMatrix(10, 10, 15, vsk)
-        matrix.wobble(1)
-        for row_index in range(matrix.get_height()):
-            for col_index in range(matrix.get_width()):
-                if matrix.point_at(row_index, col_index).draw_right:
-                    vsk.line(
-                            matrix.point_at(row_index, col_index).x,
-                            matrix.point_at(row_index, col_index).y,
-                            matrix.point_at(row_index, col_index + 1).x,
-                            matrix.point_at(row_index, col_index + 1).y,
+def draw() -> None:
+    drawing = svgwrite.Drawing(filename='test.svg')
+    gtree = GrowingTreeMaze(40, 58, 5)
+    gtree.generate()
+    matrix = gtree.get_grid()
+    for row_index in range(matrix.get_height()):
+        for col_index in range(matrix.get_width()):
+            if matrix.point_at(row_index, col_index).draw_right:
+                drawing.add(
+                        Line(
+                            (matrix.point_at(row_index, col_index).x,
+                             matrix.point_at(row_index, col_index).y),
+                            (matrix.point_at(row_index, col_index + 1).x,
+                             matrix.point_at(row_index, col_index + 1).y),
+                            stroke="black",
+                            stroke_width="1"
+                            ),
+                        )
+            if matrix.point_at(row_index, col_index).draw_down:
+                drawing.add(
+                        Line(
+                            (matrix.point_at(row_index, col_index).x,
+                             matrix.point_at(row_index, col_index).y),
+                            (matrix.point_at(row_index + 1, col_index).x,
+                             matrix.point_at(row_index + 1, col_index).y),
+                            stroke="black",
+                            stroke_width="1"
                             )
-                if matrix.point_at(row_index, col_index).draw_down:
-                    vsk.line(
-                            matrix.point_at(row_index, col_index).x,
-                            matrix.point_at(row_index, col_index).y,
-                            matrix.point_at(row_index + 1, col_index).x,
-                            matrix.point_at(row_index + 1, col_index).y,
-                            )
-
-    def finalize(self, vsk: vsketch.Vsketch) -> None:
-        vsk.vpype("linemerge linesimplify reloop linesort")
+                        )
+    drawing.save(pretty=True)
 
 
 if __name__ == "__main__":
-    MazesSketch.display()
+    draw()
