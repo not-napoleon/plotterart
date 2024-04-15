@@ -18,6 +18,9 @@ class LaticePoint:
         return "(%s, %s, %s, %s)" % (self.x, self.y, self.draw_right,
                                      self.draw_down)
 
+    def getXYPoint(self) -> XYPoint:
+        return XYPoint(self.x, self.y)
+
 
 class GridMatrix:
 
@@ -45,16 +48,16 @@ class GridMatrix:
     def get_height(self) -> int:
         return self.height
 
-    def point_at(self, row, col):
+    def point_at(self, row, col) -> LaticePoint:
         return self.matrix[row][col]
 
-    def point_set_draws_right(self, row, col, val):
+    def point_set_draws_right(self, row, col, val) -> None:
         self.matrix[row][col].draw_right = val
 
-    def point_set_draws_down(self, row, col, val):
+    def point_set_draws_down(self, row, col, val) -> None:
         self.matrix[row][col].draw_down = val
 
-    def is_carved(self, row, col):
+    def is_carved(self, row, col) -> bool:
         """
         This is confusing, sorry future me.  GirdMatrix is organized by points,
         not boxes. This method cares about boxes.  We adopt the convention that
@@ -74,7 +77,7 @@ class GridMatrix:
                 self.matrix[row][col + 1].draw_down is False
             )
 
-    def draw_lines(self, drawing):
+    def draw_lines(self, drawing) -> None:
         for row_index in range(self.get_height()):
             for col_index in range(self.get_width()):
                 if self.point_at(row_index, col_index).draw_right:
@@ -100,32 +103,58 @@ class GridMatrix:
                                 )
                             )
     
-    def draw_smooth(self, drawing):
-        for row_index in range(1, self.get_height() - 2):
-            for col_index in range(1, self.get_width() - 2):
-                if self.point_at(row_index, col_index).draw_right:
-                    (c0, c1, c2, c3) = cr(XYPoint(self.point_at(row_index, col_index-1).x, self.point_at(row_index, col_index-1).y),
-                                          XYPoint(self.point_at(row_index, col_index).x, self.point_at(row_index, col_index).y),
-                                          XYPoint(self.point_at(row_index, col_index+1).x, self.point_at(row_index, col_index+1).y),
-                                          XYPoint(self.point_at(row_index, col_index+2).x, self.point_at(row_index, col_index+2).y)
-                                          )
-                    drawing.add(Path(["M {},{}".format(c0.x, c0.y),
-                                      "C {},{} {},{} {},{}".format(c1.x, c1.y, c2.x, c2.y, c3.x, c3.y)])
-                            
-                            )
-                if self.point_at(row_index, col_index).draw_down:
-                    # Compute the Catmull-Rom Spline segment from the current row,col to row+1,col
-                    #     Taking special care to correctly compute the edge points via reflection
-                    # Convert the Catmull-Rom segment into Cubic Bezier form
-                    # Add the Cubic Bezier to the drawing
-                    (c0, c1, c2, c3) = cr(XYPoint(self.point_at(row_index-1, col_index).x, self.point_at(row_index-1, col_index).y),
-                                          XYPoint(self.point_at(row_index, col_index).x, self.point_at(row_index, col_index).y),
-                                          XYPoint(self.point_at(row_index+1, col_index).x, self.point_at(row_index+1, col_index).y),
-                                          XYPoint(self.point_at(row_index+2, col_index).x, self.point_at(row_index+2, col_index).y)
-                                          )
-                    drawing.add(Path(["M {},{}".format(c0.x, c0.y),
-                                      "C {},{} {},{} {},{}".format(c1.x, c1.y, c2.x, c2.y, c3.x, c3.y)])
-                                )
+    def draw_smooth(self, drawing) -> None:
+        for row_index in range(0, self.get_height()):
+            points = []
+            for col_index in range(0, self.get_width()):
+                # This is dumb.  I bet NumPy has a way to slice rows and columns out of a matrix.
+                points.append(self.point_at(row_index, col_index))
+            drawing.add(Path(catmull_rom(points, False), stroke="black", stroke_width="5", fill="none"))
+
+        for col_index in range(0, self.get_width()):
+            points = []
+            for row_index in range(0, self.get_height()):
+                points.append(self.point_at(row_index, col_index))
+            drawing.add(Path(catmull_rom(points, True), stroke="black", stroke_width="5", fill="none"))
+
+
+# Spline Stuff
+# TODO: pull this into a different file
+def catmull_rom(points, draw_down):
+    """
+    Compute the Catmull-Rom spline passing through all of the provided control points
+    
+    Returns an array of path commands
+    """
+    path_components = []
+    path_components.append("M {},{}".format(points[1].x, points[1].y))
+    # TODO: do anything useful with the end points
+    for i in range(1, len(points) - 2):
+        p0 = points[i-1]
+        p1 = points[i]
+        p2 = points[i + 1]
+        p3 = points[i + 2]
+        if draw_down:
+            draw = p1.draw_down
+        else:
+            draw = p1.draw_right
+        if draw:
+            # Compute the Catmull-Rom Spline segment from the current row,col to row+1,col
+            #     Taking special care to correctly compute the edge points via reflection
+            # Convert the Catmull-Rom segment into Cubic Bezier form
+            # Add the Cubic Bezier to the drawing
+            (c0, c1, c2, c3) = cr(p0.getXYPoint(),
+                                  p1.getXYPoint(),
+                                  p2.getXYPoint(),
+                                  p3.getXYPoint()
+                                  )
+            # c0 should be the current point, so we don't need to specify it
+            path_components.append("C {},{} {},{} {},{}".format(c1.x, c1.y, c2.x, c2.y, c3.x, c3.y))
+        else:
+            # otherwise just move the pen to the next point
+            path_components.append("M {},{}".format(p2.x, p2.y))
+    return path_components
+
 
 def cr(p0, p1, p2, p3):
     """
