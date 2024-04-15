@@ -2,6 +2,7 @@ import click
 import svgwrite
 from svgwrite.shapes import Line
 from plots.mazes.GrowingTree import GrowingTree
+from plots.mazes.GridMatrix import GridMatrix
 
 
 @click.group()
@@ -17,31 +18,14 @@ def hello():
 @cli.command()
 def draw() -> None:
     drawing = svgwrite.Drawing(filename='test.svg')
-    gtree = GrowingTree(40, 58, 5)
+    gtree = GrowingTree(40, 58, 20)
     gtree.generate()
-    matrix = gtree.get_grid()
-    for row_index in range(matrix.get_height()):
-        for col_index in range(matrix.get_width()):
-            if matrix.point_at(row_index, col_index).draw_right:
-                drawing.add(
-                        Line(
-                            (matrix.point_at(row_index, col_index).x,
-                             matrix.point_at(row_index, col_index).y),
-                            (matrix.point_at(row_index, col_index + 1).x,
-                             matrix.point_at(row_index, col_index + 1).y),
-                            stroke="black",
-                            stroke_width="1"
-                            ),
-                        )
-            if matrix.point_at(row_index, col_index).draw_down:
-                drawing.add(
-                        Line(
-                            (matrix.point_at(row_index, col_index).x,
-                             matrix.point_at(row_index, col_index).y),
-                            (matrix.point_at(row_index + 1, col_index).x,
-                             matrix.point_at(row_index + 1, col_index).y),
-                            stroke="black",
-                            stroke_width="1"
-                            )
-                        )
+    gtree.get_grid().draw_smooth(drawing)
+    drawing.save(pretty=True)
+
+@cli.command()
+def grid() -> None:
+    drawing = svgwrite.Drawing(filename='test.svg')
+    matrix = GridMatrix(40, 58, 20)
+    matrix.draw_smooth(drawing)
     drawing.save(pretty=True)
