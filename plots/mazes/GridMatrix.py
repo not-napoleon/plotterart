@@ -15,8 +15,7 @@ class LaticePoint:
         self.draw_right = True
 
     def __str__(self) -> str:
-        return "(%s, %s, %s, %s)" % (self.x, self.y, self.draw_right,
-                                     self.draw_down)
+        return "LaticePoint({:3.2f}, {:3.2f}, {}, {})".format(self.x, self.y, self.draw_right, self.draw_down)
 
     def getXYPoint(self) -> XYPoint:
         return XYPoint(self.x, self.y)
@@ -127,13 +126,33 @@ def catmull_rom(points, draw_down):
     Returns an array of path commands
     """
     path_components = []
-    path_components.append("M {},{}".format(points[1].x, points[1].y))
+    path_components.append("M {},{}".format(points[0].x, points[0].y))
     # TODO: do anything useful with the end points
-    for i in range(1, len(points) - 2):
-        p0 = points[i-1]
+    for i in range(0, len(points) - 1):
+
+        # p1 and p2 will always exist. For edge cases, compute p0 or p3 in terms 
+        # of p2 or p1, respectively, so we should set those values first
         p1 = points[i]
         p2 = points[i + 1]
-        p3 = points[i + 2]
+
+        if i == 0:
+            # for the first point, reflect p2 across p1
+            p0 = LaticePoint(
+                    p1.x-(p2.x - p1.x),
+                    p1.y-(p2.y - p1.y)
+                    )
+        else: 
+            p0 = points[i-1]
+
+        if i == len(points) - 2:
+            # for the last point, reflect p1 across p2
+            p3 = LaticePoint(
+                    p2.x-(p1.x - p2.x),
+                    p2.y-(p1.y - p2.y)
+                    )
+        else:
+            p3 = points[i + 2]
+
         if draw_down:
             draw = p1.draw_down
         else:
